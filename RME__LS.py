@@ -51,3 +51,16 @@ plt.title("True vs Estimated Power Coefficients at Transmitter Locations")
 plt.grid(True)
 plt.show()
 
+measurements_true = np.dot(A, true_coeffs)
+measurements_estimation = np.dot(A, estimated_coeffs)
+
+plt.figure(figsize = (8, 6))
+plt.plot(measurement_locs, measurements_true, linestyle = "solid", color = "g", label = 'True Map')
+plt.plot(measurement_locs, measurements_estimation, linestyle="dashdot", color = "r", label = 'Estimated Map')
+
+plt.xlabel("Locations")
+plt.ylabel("Power")
+plt.title("True vs Estimated Power")
+plt.legend(loc = "upper right") 
+plt.grid(True)
+plt.show()
