@@ -87,7 +87,7 @@ class DnnEstimator(MapEstimator):
     def estimate(self, X_test):        
         return self.model.predict(X_test)        
         
-
+sys.path.append('map_generator')
 
 # Initialize parameters
 mapGen = MapGenerator1D(
