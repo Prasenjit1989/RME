@@ -4,6 +4,8 @@ import random
 
 import gsim
 from gsim.gfigure import GFigure
+from map_estimator.map_estimators import KnnEstimator
+from map_generator.map_generator_1d import MapGenerator1D
 
 
 class ExperimentSet(gsim.AbstractExperimentSet):
