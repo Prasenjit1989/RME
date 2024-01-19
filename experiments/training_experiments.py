@@ -30,6 +30,31 @@ class ExperimentSet(gsim.AbstractExperimentSet):
           just loads the weights upon instantiation (pass file name of the
           weights to the constructor).
 
+          
+        -------------------------------------------
+        Pseudocode for this experiment
+
+        map_generator = MapGenerator1D(args)
+
+        v_true_map = map_generator.generate_map()
+
+        v_meas, v_meas_locs = get_measurements(v_true_map)
+
+        l_estimators = [PolynomialEstimator(args), KNN(args)]
+
+        l_estimates = []
+        for estimator in l_estimators:
+            v_estimated_map = estimator.estimate(v_meas, v_meas_locs)
+            l_estimates.append(v_estimated_map)
+
+        plot(v_true_map, v_meas, v_meas_locs, l_estimates)
+
+        
+        
+
+
+
+
         """
 
         def Polynomial_RME_estimation(measurements,
@@ -198,6 +223,40 @@ class ExperimentSet(gsim.AbstractExperimentSet):
         plt.show()
 
     def experiment_1002(l_args):
+        """ Experiment to train a DNN estimator. 
+        
+        Pseudocode:
+
+        1. GENEREATE THE DATA SET
+
+        num_maps = 1000
+        map_generator = MapGenerator1D(args)
+        l_dataset = []
+
+        for ind_map in range(num_maps):
+        
+            v_true_map = map_generator.generate_map()
+            v_meas, v_meas_locs = get_measurements(v_true_map)
+
+            m_input = [v_meas, v_meas_locs]
+            v_target = v_true_map
+
+            l_dataset.append((m_input, v_target)))
+
+            
+        2. TRAIN THE DNN ESTIMATOR
+
+        estimator = DNN_RME_estimation(args)
+
+        training_history = estimator.train(l_dataset)
+
+        plot(training_history) # training and validation loss vs. epoch index
+        
+    
+        """
+
+    ######### TEST EXPERIMENTS #########
+    def experiment_10002(l_args):
         """The full potential of GSim is exploited by returning GFigures
         rather than directly plotting them. GFigures are stored and
         can be plotted and edited afterwards without having to run
@@ -225,7 +284,7 @@ class ExperimentSet(gsim.AbstractExperimentSet):
 
         return G
 
-    def experiment_1003(l_args):
+    def experiment_10003(l_args):
         """ 
         In some occasions, it may be useful to access a GFigure created by a
         previously-run experiment; e.g. to combine multiple figures. 
