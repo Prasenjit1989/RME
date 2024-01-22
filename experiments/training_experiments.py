@@ -4,8 +4,10 @@ import random
 
 import gsim
 from gsim.gfigure import GFigure
-from map_estimator.map_estimators import KnnEstimator
+from map_estimator.map_estimators import KnnEstimator, PolynomialEstimator, LinearInterpEstimator, DnnEstimator
 from map_generator.map_generator_1d import MapGenerator1D
+from map_generator import map_generator_1d
+from map_estimator import map_estimators
 
 
 class ExperimentSet(gsim.AbstractExperimentSet):
@@ -50,15 +52,46 @@ class ExperimentSet(gsim.AbstractExperimentSet):
             l_estimates.append(v_estimated_map)
 
         plot(v_true_map, v_meas, v_meas_locs, l_estimates)
-
-        
-        
-
-
-
-
         """
+        # Initialize parameters
+        mapGen = MapGenerator1D(
+            alpha = 30,
+            n_tx = 3,
+            r_x_min = 1,
+            r_x_max = 100
+            )
 
+        num_points = 100
+        num_maps = 1
+        y_coord = 1
+        num_samples = 20
+        noise_level = 0.1
+
+        m_tx_locs, v_x, v_received_power = mapGen.generate_map(num_points = num_points, y_coord = y_coord)
+        v_noise = mapGen.generate_noise(noise_level = noise_level,
+                                        num_points = num_points)
+        v_sampling_mask, v_measurement_locs = mapGen.generate_sampling_mask(num_samples = num_samples, 
+                                               num_points = num_points)
+        v_measurements = mapGen.generate_measurement_data(v_x, v_received_power, v_noise, 
+                                                                  v_sampling_mask)
+        
+        # KNN estimation
+        num_neighbors=5 # For KNN Estimator
+        degree=5 # For Polynomial estimator
+
+        l_estimator = [KnnEstimator(num_neighbors=num_neighbors), 
+                       PolynomialEstimator(degree = degree),
+                       LinearInterpEstimator()]
+        l_methods_name = ["KNN", "Polynomial Estimator", "Linear Interpolation"]
+        l_estimates = []
+        for i in range(len(l_estimator)):
+            v_estimated_map = l_estimator[i].estimate(v_measurement_locs, v_measurements, v_x)
+            l_estimates.append(l_estimates)
+        
+            map_estimators.plot_true_and_estimated_maps(v_x, v_received_power, v_estimated_map, v_measurement_locs, v_measurements, fig_title = l_methods_name[i])
+        
+        
+        """
         def Polynomial_RME_estimation(measurements,
                                       measurement_locs,
                                       grid_x_test,
@@ -222,7 +255,7 @@ class ExperimentSet(gsim.AbstractExperimentSet):
         plt.title("True vs Estimated Power")
         plt.legend(loc="upper right")
         plt.grid(True)
-        plt.show()
+        plt.show() """
 
     def experiment_1002(l_args):
         """ Experiment to train a DNN estimator. 
@@ -252,10 +285,64 @@ class ExperimentSet(gsim.AbstractExperimentSet):
 
         training_history = estimator.train(l_dataset)
 
-        plot(training_history) # training and validation loss vs. epoch index
-        
-    
+        plot(training_history) # training and validation loss vs. epoch index 
         """
+
+        # Initialize parameters
+        mapGen = MapGenerator1D(
+            alpha = 30,
+            n_tx = 3,
+            r_x_min = 1,
+            r_x_max = 100
+            )
+
+        num_maps = 1000
+        num_points = 100 
+        y_coord = 1
+        num_samples = 20
+        noise_level = 0.1
+
+        m_true_map_train, m_measurement_locs_train, m_measurements_train, _, _ = map_generator_1d.data_generation_dnn(mapGen, num_maps=1000,
+                                            num_points = num_points, y_coord = y_coord, num_samples = 20, noise_level = 0.1)
+        m_true_map_test, m_measurement_locs_test, m_measurements_test, _, _ = map_generator_1d.data_generation_dnn(mapGen, num_maps=30, 
+                                            num_points = num_points, y_coord = y_coord, num_samples = 20, noise_level = 0.1)
+        # print("True meas", m_true_map_train.shape, "locs", m_measurement_locs_train.shape, "meas", m_measurements_train.shape)
+
+        m_input_train = np.concatenate((m_measurement_locs_train, m_measurements_train), axis = 1)
+        m_target_train = m_true_map_train
+        m_input_test = np.concatenate((m_measurement_locs_test, m_measurements_test), axis = 1)
+
+        # Normalize the dataset
+        m_input_train_norm = (m_input_train - m_input_train.mean(axis = 0)) / m_input_train.std(axis = 0)
+        m_input_test_norm = (m_input_test - m_input_test.mean(axis = 0)) / m_input_test.std(axis = 0)
+
+        # DNN size
+        input_layer_size = m_input_train_norm.shape[1]
+        hidden_layers_size = [64, 128]
+        output_layer_size = m_target_train.shape[1]
+
+        # Create a DNN model
+        dnn_model = DnnEstimator(input_layer_size = input_layer_size, 
+                            hidden_layers_size = hidden_layers_size,
+                            output_layer_size = output_layer_size
+                            )
+        
+        # train a model
+        training_history = dnn_model.train_model(m_input_train_norm, m_target_train, epochs = 200, validation_split = 0.25, batch_size = 32)
+        dnn_model.plot_training_history(training_history)
+        # Save weights to a file
+        weight_file_name = 'dnn_weights_rme_estimation_1d.h5'
+        dnn_model.save_weights(weight_file_name)
+
+        # Testing a model
+        new_dnn_model = DnnEstimator(input_layer_size = input_layer_size, 
+                                    hidden_layers_size = hidden_layers_size,
+                                    output_layer_size = output_layer_size)
+        new_dnn_model.load_weights(weight_file_name)
+
+        # Estimate map
+        m_estimated_maps = new_dnn_model.estimate(m_input_test_norm)
+
 
     ######### TEST EXPERIMENTS #########
     def experiment_10002(l_args):
