@@ -42,4 +42,55 @@ class MapGenerator1D:
     
     def generate_measurement_data(self, v_x, v_true_map, v_noise, v_sampling_mask):
         return  np.multiply(v_true_map + v_noise, v_sampling_mask)[np.where(v_sampling_mask == 1)] 
+    
+
+def data_generation_dnn(mapGen, num_maps=100, num_points = 100, y_coord = 1, num_samples = 20, noise_level = 0.1):
+    dict_true_map= {
+        'm_tx_locs': [],
+        'm_x': [],
+        'm_received_power': [],
+        'y_coord': []    
+        }  
+      
+    m_noise = []
+    dict_sampling_mask = {
+        'm_sampling_mask': [],
+        'm_measurement_locs': []
+        }
+    m_measurements =[]
+    mapGen = MapGenerator1D()
+    for _ in range(num_maps):    
+        m_tx_locs, v_x, v_received_power = mapGen.generate_map(num_points = num_points, y_coord = y_coord)
+
+        dict_true_map['m_tx_locs'].append(m_tx_locs)
+        dict_true_map['m_x'].append(v_x)
+        dict_true_map['m_received_power'].append(v_received_power)
+        dict_true_map['y_coord'].append(y_coord)
+
+        v_noise = mapGen.generate_noise(noise_level = noise_level, 
+                                    num_points = num_points)
+        m_noise.append(v_noise)
+        
+        v_sampling_mask, v_measurement_locs = mapGen.generate_sampling_mask(num_samples = num_samples, 
+                                                       num_points = num_points)
+        
+        dict_sampling_mask['m_sampling_mask'].append(v_sampling_mask)
+        dict_sampling_mask['m_measurement_locs'].append(v_measurement_locs)    
+        
+        m_measurements.append(mapGen.generate_measurement_data(v_x, v_received_power, v_noise, 
+                                                                          v_sampling_mask))
+    # Convert list into array in dictionary
+    dict_true_map['m_tx_locs'] = np.array(dict_true_map['m_tx_locs'])
+    dict_true_map['m_x'] = np.array(dict_true_map['m_x'])
+    dict_true_map['m_received_power'] = np.array(dict_true_map['m_received_power'])
+    dict_true_map['y_coord'] = np.array(dict_true_map['y_coord'])
+
+    m_noise = np.array(m_noise)
+
+    dict_sampling_mask['m_sampling_mask'] = np.array(dict_sampling_mask['m_sampling_mask'])
+    dict_sampling_mask['m_measurement_locs'] = np.array(dict_sampling_mask['m_measurement_locs'])
+
+    m_measurements = np.array(m_measurements)
+    
+    return dict_true_map['m_received_power'], dict_sampling_mask['m_measurement_locs'], m_measurements, m_noise, dict_sampling_mask
 
