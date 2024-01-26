@@ -56,26 +56,29 @@ class ExperimentSet(gsim.AbstractExperimentSet):
         plot(v_true_map, v_meas, v_meas_locs, l_estimates)
         """
         # Initialize parameters
-        mapGen = MapGenerator1D(
-            alpha = 30,
-            num_tx = 3,
-            x_lim = [0, 100],
-            y_lim = [0, 50],
-            y_coord_meas_line = 1                
-            )      
+        mapGen = MapGenerator1D(alpha=30,
+                                num_tx=3,
+                                x_lim=[0, 100],
+                                y_lim=[0, 50],
+                                y_coord_meas_line=1)
 
         num_points = 100
         num_meas = 20
         noise_std = 0.01
 
-        v_x, v_received_power = mapGen.generate_map(num_points = num_points)
-        v_meas_locs, v_meas=measure_map(v_x, v_received_power, num_meas = num_meas, noise_std = noise_std)
+        v_x, v_rx_power = mapGen.generate_map(num_points=num_points)
+        v_meas_locs, v_meas = measure_map(v_x,
+                                          v_rx_power,
+                                          num_meas=num_meas,
+                                          noise_std=noise_std)
 
-        l_estimators = [KnnEstimator(num_neighbors=5), 
-                       PolynomialEstimator(degree = 4),
-                       LinearInterpEstimator()]
-        G = GFigure(xaxis = v_x, 
-                    yaxis = v_received_power,
+        l_estimators = [
+            KnnEstimator(num_neighbors=1),
+            PolynomialEstimator(degree=10),
+            LinearInterpEstimator()
+        ]
+        G = GFigure(xaxis=v_x,
+                    yaxis=v_rx_power,
                     xlabel="x[m]",
                     ylabel="Estimated Map",
                     title="True and Estimated Maps",
@@ -85,14 +88,14 @@ class ExperimentSet(gsim.AbstractExperimentSet):
                     legend="Measurement Data",
                     mode="stem",
                     styles="ob")
-        
+
         l_estimated_maps = []
         for estimator in l_estimators:
             v_estimated_map = estimator.estimate(v_meas_locs, v_meas, v_x)
             l_estimated_maps.append(v_estimated_map)
-            G.add_curve(xaxis=v_x, yaxis=v_estimated_map, legend=estimator.method_name)
-
-           
+            G.add_curve(xaxis=v_x,
+                        yaxis=v_estimated_map,
+                        legend=estimator.method_name)
 
         return G
         """
@@ -293,77 +296,89 @@ class ExperimentSet(gsim.AbstractExperimentSet):
         """
 
         # Initialize parameters
-        mapGen = MapGenerator1D(
-            alpha = 30,
-            num_tx = 3,
-            x_lim = [0, 100],
-            y_lim = [0, 50],
-            y_coord_meas_line = 1
-            )
-     
-        num_points = 100 
+        mapGen = MapGenerator1D(alpha=30,
+                                num_tx=3,
+                                x_lim=[0, 100],
+                                y_lim=[0, 50],
+                                y_coord_meas_line=1)
+
+        num_points = 100
         num_meas = 20
         noise_std = 0.01
         num_maps = 1000
 
-        m_input = []
-        m_target = []
+        lv_input = []
+        lv_target = []
         for ind_map in range(num_maps):
-            v_x, v_true_map = mapGen.generate_map(num_points = num_points)
-            v_meas_locs, v_meas=measure_map(v_x, v_true_map, num_meas = num_meas, noise_std = noise_std)
-            v_sampling_mask, v_meas_masked = generate_sampling_mask(v_meas_locs, v_meas, v_x)
-            m_input.append(np.concatenate([v_sampling_mask, v_meas_masked], axis = 0))
-            m_target.append(v_true_map)        
+            v_x, v_true_map = mapGen.generate_map(num_points=num_points)
+            v_meas_locs, v_meas = measure_map(v_x,
+                                              v_true_map,
+                                              num_meas=num_meas,
+                                              noise_std=noise_std)
+            v_sampling_mask, v_meas_masked = generate_sampling_mask(
+                v_meas_locs, v_meas, v_x)
+            lv_input.append(
+                np.concatenate([v_sampling_mask, v_meas_masked], axis=0))
+            lv_target.append(v_true_map)
 
-        m_input = np.array(m_input)
-        m_target = np.array(m_target)
+        lv_input = np.array(lv_input)
+        lv_target = np.array(lv_target)
 
         l_hidden_layers_size = [32, 8]
         # Create a DNN model
-        dnn_model = DnnEstimator(input_layer_size = m_input.shape[1], 
-                            hidden_layers_size = l_hidden_layers_size,
-                            output_layer_size = m_target.shape[1]
-                            )
-        
+        dnn_model = DnnEstimator(input_layer_size=lv_input.shape[1],
+                                 hidden_layers_size=l_hidden_layers_size,
+                                 output_layer_size=lv_target.shape[1])
+
         # train a model
-        training_history = dnn_model.train_model(m_input, m_target, epochs = 200, validation_split = 0.25, batch_size = 32)
+        training_history = dnn_model.train_model(lv_input,
+                                                 lv_target,
+                                                 epochs=200,
+                                                 validation_split=0.25,
+                                                 batch_size=32)
         # dnn_model.plot_training_history(training_history)
 
         # Plot Training history
         epochs = training_history.epoch
         training_loss = training_history.history['loss']
-        G = GFigure(xaxis = epochs, 
-                    yaxis = training_loss,
+        G = GFigure(xaxis=epochs,
+                    yaxis=training_loss,
                     xlabel="Epochs",
                     ylabel="Loss",
                     title="Training and Validation Loss",
                     legend="Training Loss")
-        
+
         if 'val_loss' in training_history.history:
             validation_loss = training_history.history['val_loss']
-            G.add_curve(xaxis=epochs, yaxis=validation_loss, legend="Validation Loss")
-        
+            G.add_curve(xaxis=epochs,
+                        yaxis=validation_loss,
+                        legend="Validation Loss")
+
         # Save weights to a file
         weight_file_name = 'dnn_weights_rme_estimation_1d.h5'
         dnn_model.save_weights(weight_file_name)
 
         # Testing a model
-        new_dnn_model = DnnEstimator(input_layer_size = m_input.shape[1], 
-                                    hidden_layers_size = l_hidden_layers_size,
-                                    output_layer_size = m_target.shape[1])
+        new_dnn_model = DnnEstimator(input_layer_size=lv_input.shape[1],
+                                     hidden_layers_size=l_hidden_layers_size,
+                                     output_layer_size=lv_target.shape[1])
         new_dnn_model.load_weights(weight_file_name)
 
         # Generate test data
-        v_x_test, v_true_map_test = mapGen.generate_map(num_points = num_points)
-        v_meas_locs_test, v_meas_test=measure_map(v_x_test, v_true_map_test, num_meas = 1, noise_std = noise_std)
-        v_sampling_mask_test, v_meas_masked_test = generate_sampling_mask(v_meas_locs_test, v_meas_test, v_x_test)
-        v_input_test = np.concatenate([v_sampling_mask_test, v_meas_masked_test], axis = 0)
-        
+        v_x_test, v_true_map_test = mapGen.generate_map(num_points=num_points)
+        v_meas_locs_test, v_meas_test = measure_map(v_x_test,
+                                                    v_true_map_test,
+                                                    num_meas=1,
+                                                    noise_std=noise_std)
+        v_sampling_mask_test, v_meas_masked_test = generate_sampling_mask(
+            v_meas_locs_test, v_meas_test, v_x_test)
+        v_input_test = np.concatenate(
+            [v_sampling_mask_test, v_meas_masked_test], axis=0)
+
         # Estimate map
         v_estimated_maps = new_dnn_model.estimate(v_input_test.reshape(1, -1))
 
         return G
-
 
     ######### TEST EXPERIMENTS #########
     def experiment_10002(l_args):
@@ -408,30 +423,37 @@ class ExperimentSet(gsim.AbstractExperimentSet):
 
 
 def measure_map(v_x, v_true_map, num_meas, noise_std):
-    def generate_measurement_locs_index(num_samples = 20, num_points = 100):
-        return np.array(sorted(np.random.choice(num_points, size = num_samples, replace = False)))
+
+    def generate_measurement_locs_index(num_samples=20, num_points=100):
+        return np.array(
+            sorted(
+                np.random.choice(num_points, size=num_samples, replace=False)))
         # return np.array(sorted(np.random.randint(0, num_points, num_samples)))
-    
+
     def generate_noise(noise_std, num_meas):
         # return noise_level * np.random.uniform(0, 0.1, size = num_points)
         return np.random.normal(0, noise_std, num_meas)
-    
-    v_meas_locs_ind = generate_measurement_locs_index(num_meas, num_points = v_x.shape[0])
+
+    v_meas_locs_ind = generate_measurement_locs_index(num_meas,
+                                                      num_points=v_x.shape[0])
     v_meas_locs = v_x[v_meas_locs_ind]
-    v_noise = generate_noise(noise_std = noise_std, num_meas = num_meas) # same shape of no. of measurements
+    v_noise = generate_noise(
+        noise_std=noise_std,
+        num_meas=num_meas)  # same shape of no. of measurements
     v_meas = v_true_map[v_meas_locs_ind] + v_noise
     return v_meas_locs, v_meas
 
+
 def generate_sampling_mask(v_meas_locs, v_meas, v_x):
-    m_distances = np.abs(np.tile(v_x.reshape(-1, 1), (1, v_meas_locs.shape[0])) - np.tile(v_meas_locs.reshape(1, -1), (v_x.shape[0], 1)))
+    m_distances = np.abs(
+        np.tile(v_x.reshape(-1, 1), (1, v_meas_locs.shape[0])) -
+        np.tile(v_meas_locs.reshape(1, -1), (v_x.shape[0], 1)))
     # v_min_dist = m_distances.min(axis = 0)
-    v_min_dist_ind = np.argmin(m_distances, axis = 0)
+    v_min_dist_ind = np.argmin(m_distances, axis=0)
 
     v_sampling_mask = np.zeros_like(v_x)
-    v_sampling_mask[v_min_dist_ind] = 1 
+    v_sampling_mask[v_min_dist_ind] = 1
     v_meas_masked = np.zeros_like(v_sampling_mask)
     v_meas_masked[v_sampling_mask == 1] = v_meas
 
     return v_sampling_mask, v_meas_masked
-    
-

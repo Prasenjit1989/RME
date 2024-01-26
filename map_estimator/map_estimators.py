@@ -5,7 +5,6 @@ import tensorflow as tf
 from tensorflow.keras import layers, models
 import sys
 import matplotlib.pyplot as plt
-
 """ class MapEstimator:
     def __init__(self): # 
         # self.v_measurement_locs = v_measurement_locs
@@ -22,65 +21,104 @@ import matplotlib.pyplot as plt
 
 
 class PolynomialEstimator():
+
     def __init__(self, degree=5):
         # super().__init__(v_measurement_locs, v_measurements, v_grid_x)
         self.degree = degree
         self.method_name = "Polynomial Estimator"
-    
+
     def estimate(self, v_measurement_locs, v_measurements, v_grid_x):
-        v_meas_locs_poly = np.vander(v_measurement_locs, self.degree +1, increasing = True)
-        estimated_coeff = np.linalg.lstsq(v_meas_locs_poly, v_measurements, rcond = None)[0]
-        v_grid_x_poly = np.vander(v_grid_x, self.degree + 1, increasing = True)
+        v_meas_locs_poly = np.vander(v_measurement_locs,
+                                     self.degree + 1,
+                                     increasing=True)
+        estimated_coeff = np.linalg.lstsq(v_meas_locs_poly,
+                                          v_measurements,
+                                          rcond=None)[0]
+        v_grid_x_poly = np.vander(v_grid_x, self.degree + 1, increasing=True)
         return np.dot(v_grid_x_poly, estimated_coeff)
 
+
 class LinearInterpEstimator():
+
     def __init__(self):
         self.method_name = "Linear Interpolation"
-    
+
     def estimate(self, v_measurement_locs, v_measurements, v_grid_x):
         estimated_power = np.zeros(v_grid_x.shape)
         for i in range(len(v_grid_x)):
-            k = np.searchsorted(v_measurement_locs, v_grid_x[i], side = 'right')
-            
+            k = np.searchsorted(v_measurement_locs, v_grid_x[i], side='right')
+
             if k == 0:
                 estimated_power[i] = v_measurements[0]
             elif k == len(v_measurements):
                 estimated_power[i] = v_measurements[-1]
             else:
-                x_left, x_right = v_measurement_locs[k-1], v_measurement_locs[k]
-                y_left, y_right = v_measurements[k-1], v_measurements[k]
-                estimated_power[i] = y_left + (v_grid_x[i] - x_left)*(y_right - y_left)/(x_right - x_left)        
+                x_left, x_right = v_measurement_locs[k -
+                                                     1], v_measurement_locs[k]
+                y_left, y_right = v_measurements[k - 1], v_measurements[k]
+                estimated_power[i] = y_left + (v_grid_x[i] - x_left) * (
+                    y_right - y_left) / (x_right - x_left)
         return estimated_power
-    
+
 
 class KnnEstimator():
-    def __init__(self, num_neighbors=5): # , v_measurement_locs, v_measurements, v_grid_x        
+
+    def __init__(
+            self,
+            num_neighbors=5):  # , v_measurement_locs, v_measurements, v_grid_x
         self.num_neighbors = num_neighbors
-        self.knn_reg = KNeighborsRegressor(n_neighbors=self.num_neighbors, weights='distance')
+        self.knn_reg = KNeighborsRegressor(n_neighbors=self.num_neighbors,
+                                           weights='distance')
         self.method_name = "KNN Estimator"
 
     def estimate(self, v_measurement_locs, v_measurements, v_grid_x):
-        self.knn_reg.fit(v_measurement_locs.reshape(-1, 1), v_measurements.reshape(-1, 1))
+        self.knn_reg.fit(v_measurement_locs.reshape(-1, 1),
+                         v_measurements.reshape(-1, 1))
         return self.knn_reg.predict(v_grid_x.reshape(-1, 1)).ravel()
-    
+
+
 class DnnEstimator():
-    def __init__(self, input_layer_size, hidden_layers_size, output_layer_size):
-        self.model = self.build_model(input_layer_size, hidden_layers_size, output_layer_size)
-        self.method_name = "DNN Estimator"     
+    """
     
-    def build_model(self, input_layer_size, l_hidden_layers_size, output_layer_size):
+    Test error:   E[ || y - y_hat ||^2 ] 
+
+    Estimate of the test error:  (1 / N) \sum_n^N || y_n - y_hat_n ||^2
+    
+    """
+
+    def __init__(self, input_layer_size, hidden_layers_size,
+                 output_layer_size):
+        self.model = self.build_model(input_layer_size, hidden_layers_size,
+                                      output_layer_size)
+        self.method_name = "DNN Estimator"
+
+    def build_model(self, input_layer_size, l_hidden_layers_size,
+                    output_layer_size):
         model = models.Sequential()
-        model.add(layers.Dense(l_hidden_layers_size[0], activation = 'relu', input_shape = (input_layer_size, ))),
+        model.add(
+            layers.Dense(l_hidden_layers_size[0],
+                         activation='relu',
+                         input_shape=(input_layer_size, ))),
         for i in range(1, len(l_hidden_layers_size)):
-            model.add(layers.Dense(l_hidden_layers_size[i], activation = 'relu')),
-        
+            model.add(layers.Dense(l_hidden_layers_size[i],
+                                   activation='relu')),
+
         model.add(layers.Dense(output_layer_size))
-        model.compile(optimizer = 'adam', loss = 'mse')
-        return model            
-        
-    def train_model(self, m_X_train, m_y_train, epochs = 100, validation_split = 0.25, batch_size = 32):
-        return self.model.fit(m_X_train, m_y_train, epochs = epochs, validation_split = validation_split, batch_size = batch_size)
-    
+        model.compile(optimizer='adam', loss='mse')
+        return model
+
+    def train_model(self,
+                    m_X_train,
+                    m_y_train,
+                    epochs=100,
+                    validation_split=0.25,
+                    batch_size=32):
+        return self.model.fit(m_X_train,
+                              m_y_train,
+                              epochs=epochs,
+                              validation_split=validation_split,
+                              batch_size=batch_size)
+
     # def plot_training_history(self, history):
     #     plt.plot(history.history['loss'], label = 'Training Loss')
     #     if 'val_loss' in history.history:
@@ -94,12 +132,14 @@ class DnnEstimator():
 
     def save_weights(self, file_name):
         self.model.save_weights(file_name)
-        
-    def load_weights (self, file_name):
+
+    def load_weights(self, file_name):
         self.model.load_weights(file_name)
-        
-    def estimate(self, m_X_test):        
-        return self.model.predict(m_X_test) 
+
+    def estimate(self, m_X_test):
+        return self.model.predict(m_X_test)
+
+
 """ 
 def plot_true_and_estimated_maps(v_x, v_true_map, v_estimated_map, v_meas_locs, v_meas, fig_title = "KNN"): # v_x, v_received_power, v_estimated_map, v_measurement_locs, v_measurements
     fig, ax = plt.subplots()
